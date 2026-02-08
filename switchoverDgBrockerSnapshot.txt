@@ -1,0 +1,111 @@
+manually switchover korlam
+manually switchback korlam
+data guard brocker enable korlam
+standby theke snapshot ay convert korlam 
+snapshoot theke standby ay back korlam 
+
+How to Verify if Active Data Guard is Enabled?
+
+====================================================== SWITCHOVER & SWITCH-BACK == MANUALLY ======================================================
+
+1*** Start SwitchOver first check LNS=MRP hote hobe log sequence number same hote hobe.
+	select client_process,process,sequence#,status from v$managed_standby;
+	select switchover_status from v$database; [primary te dekhabe(TO STANDBY) standby ay dakhabe(NOT ALLOWED)
+
+2*** now enable dist_1 and dist_2
+	show parameter LOG_ARCHIVE_DEST;
+	select dest_name,valid_now from v$archive_dest where dest_name='LOG_ARCHIVE_DEST_1';
+	select dest_name,status,destination from v$archive_dest where destination is NOT NULL;
+	
+	ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+	ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+	
+3*** Current primary database switchover command
+	ALTER DATABASE COMMIT TO SWITCHOVER TO PHYSICAL STANDBY WITH SESSION SHUTDOWN;
+	select switchover_status from v$database; [check status change primary and standby]
+	
+4*** Current standby database tike primary korer jonne STANDBY ay command ti holo
+	ALTER DATABASE COMMIT TO SWITCHOVER TO PRIMARY WITH SESSION SHUTDOWN;
+	alter database open;
+	select open_mode from v$database;
+	
+5*** ekhon ager primary ke mount mode ay open korbo.
+	startup mount
+	alter database open read only;
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION; [for read only mode]
+	select client_process,process,sequence#,status from v$managed_standby;
+
+
+
+========================================================================================================================
+====================================================== DG BROCKER ======================================================
+
+1*** brocker enable korer jonne check korbo  
+	select db_unique_name,database_role,switchover_status,open_mode from v$database;
+	
+2*** now primary and standby server ay DG_BROCKER enable korbo
+	sqlplus / as sysdba
+	ALTER SYSTEM SET DG_BROKER_START=TRUE SCOPE=BOTH; [primary]
+	ALTER SYSTEM SET DG_BROKER_START=TRUE SCOPE=BOTH; [standby]
+	
+3*** ekhon STANDBY ay dest_2 blank korbo
+	ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='';
+	
+4*** ekhon PRIMARY te dgmgrl / diye login kore DG_BROCKER enable korbo(primary theke)
+	su - primary
+	su - oracle
+	dgmgrl /
+	CREATE CONFIGURATION 'swhover' AS PRIMARY DATABASE IS 'livedb' CONNECT IDENTIFIER IS livedb;
+	*now add physical standby here
+		ADD DATABASE 'livedr' AS CONNECT IDENTIFIER IS livedr MAINTAINED AS PHYSICAL;
+	enable CONFIGURATION;
+	enable DATABASE livedr; [je database ti add korlam seti enable korlam]
+	show configuration;
+	show configuration verbose;
+	
+5*** ekhon standby ay dgmgrl / diye login kore dekhbo show configuration dekhay kina...
+
+6*** connect PRIMARY dgmgrl
+	dgmgrl /
+	connect sys/a123@livedb
+	switchover to livedr;
+	
+7*** connect STANDBY dgmgrl
+	dgmgrl /
+	connect sys/a123@livedr
+	switchover to livedb;[this is primary now]
+
+
+======================================================================================================================
+====================================================== SNAPSHOT ======================================================
+
+1*** snapshoot convert korer age check korte hobe open_mode=read_only kina flashback on kina.
+	select open_mode,switchover_status,flashback_on from v$database;
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL; [media recovery cancel]
+	alter database flashback on;
+	show parameter db_recovery_file_dest;
+	select open_mode,switchover_status,flashback_on,database_role from v$database;
+	
+
+2*** ekhon snapshoot ay convert korer command dibo
+	shu immediate
+	startup mount
+	ALTER DATABASE CONVERT TO SNAPSHOT STANDBY; [convert hobe]
+	*now shutdown and startup korlei snapshoot mode ay read right ay open hobe.
+	shu immediate
+	startup
+	select open_mode,database_role from v$database;[Read/Right | snapshoot standby dekhabe]
+	-now create user,table and insert data;
+	
+	
+3*** Ekhon amra snapshoot theke physical standby ay convert korbo...
+	shu immediate
+	startup mount
+	ALTER DATABASE CONVERT TO PHYSICAL STANDBY;
+	shu immediate
+	startup mount
+	alter database open read only;
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION; [for read only mode]
+	select client_process,process,sequence#,status from v$managed_standby;
+	select open_mode,database_role,switchover_status from v$database; ====>DONE Alhamdulillah
+	
