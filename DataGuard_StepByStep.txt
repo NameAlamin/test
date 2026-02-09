@@ -1,3 +1,19 @@
+SET LINESIZE 200
+SET PAGESIZE 100
+SET WRAP OFF
+COLUMN sid FORMAT 99999
+COLUMN serial# FORMAT 99999
+COLUMN username FORMAT A15
+COLUMN osuser FORMAT A15
+COLUMN machine FORMAT A25
+COLUMN program FORMAT A25
+COLUMN module FORMAT A25
+COLUMN event FORMAT A30
+COLUMN seconds_in_wait FORMAT 99999
+COLUMN state FORMAT A20
+
+
+
 *** install vm and configure oracle linux:
 
 	sda           8:0    0   80G  0 disk
@@ -796,4 +812,5 @@ ADR_BASE_LISTENER = /u01/app/oracle
 				
 					
 						
+
 
