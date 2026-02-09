@@ -1,0 +1,414 @@
+SELECT '<option value="' || m.id || '">' || m.title || '</option>' AS options 
+FROM LIB_ORG_MASTER m INNER JOIN 
+(SELECT DISTINCT d.id as x FROM LIB_POSITION p,LIB_ORG_MASTER d 
+WHERE 1=1 
+AND d.id = p.lib_org_mst_div_id AND 
+p.lib_struct_inv_org_id = 8 
+AND p.is_active = 1) xxx ON xxx.x = m.id
+
+*** Setup VM and now install oracle user and grid user set permission
+
+	vi /etc/hosts
+	vi /etc/hostname
+	
+	yum search oracle [preinstall oracle $$ install dependency package from msWord] {
+		yum install -y bc    
+		yum install -y binutils
+		yum install -y compat-libcap1
+		yum install -y compat-libstdc++-33
+		yum install -y dtrace-modules
+		yum install -y dtrace-modules-headers
+		yum install -y dtrace-modules-provider-headers
+		yum install -y dtrace-utils
+		yum install -y elfutils-libelf
+		yum install -y elfutils-libelf-devel
+		yum install -y fontconfig-devel
+		yum install -y glibc
+		yum install -y glibc-devel
+		yum install -y ksh
+		yum install -y libaio
+		yum install -y libaio-devel
+		yum install -y libdtrace-ctf-devel
+		yum install -y libXrender
+		yum install -y libXrender-devel
+		yum install -y libX11
+		yum install -y libXau
+		yum install -y libXi
+		yum install -y libXtst
+		yum install -y libgcc
+		yum install -y librdmacm-devel
+		yum install -y libstdc++
+		yum install -y libstdc++-devel
+		yum install -y libxcb
+		yum install -y make
+		yum install -y net-tools # Clusterware
+		yum install -y nfs-utils # ACFS
+		yum install -y python # ACFS
+		yum install -y python-configshell # ACFS
+		yum install -y python-rtslib # ACFS
+		yum install -y python-six # ACFS
+		yum install -y targetcli # ACFS
+		yum install -y smartmontools
+		yum install -y sysstat
+		# Added by me.
+		yum install -y gcc
+		yum install -y unixODBC
+		# New for OL8
+		yum install -y libnsl
+		yum install -y libnsl.i686
+		yum install -y libnsl2
+		yum install -y libnsl2.i686
+
+}
+	
+
+	vi /etc/selinux/config
+	setenforce permissive
+	systemctl stop firewalld
+	systemctl disable firewalld
+	
+*** setup passwd oracle. Create grid user and setup passwd. check oracle and grid id and get permission 
+
+	id oracle
+	id grid [grid not found]
+	
+	groupadd -g 54321 oinstall
+	groupadd -g 54322 dba
+	groupadd -g 54323 oper 
+
+	groupadd -g 54327 asmdba
+	groupadd -g 54328 asmoper
+	groupadd -g 54329 asmadmin
+	
+	adduser grid 
+	passwd grid
+	
+	usermod -g oinstall -G asmdba,dba,oper,asmadmin oracle
+	usermod -g oinstall -G asmdba,dba,asmoper,asmadmin grid
+	
+-------------- oracle home and base --------------
+mkdir -p /u01/app/oracle/product/19.0.0.0/dbhome_1
+chown -R oracle:oinstall /u01/app/oracle
+chmod  775 /u01
+
+-------------- grid home ------------------------
+mkdir -p /u01/app/19.0.0.0/grid
+chown -R grid:oinstall /u01/app/19.0.0.0/grid
+chmod 775 /u01
+
+-------------- grid base ------------------------
+mkdir -p /u01/app/grid
+chown -R grid:oinstall /u01/app/grid
+chmod 775 /u01
+
+-------------- oraInventory under the grid user ------------------------
+mkdir -p /u01/app/oraInventory
+chown -R grid:oinstall /u01/app/oraInventory
+chmod 775 /u01/app/oraInventory
+
+	
+	init 6
+	
+	
+*** Now install oracleasm
+	
+	yum install -y oracleasm
+	yum install kmod-oracleasm -y
+	
+	
+*** Now install asm rpm. And dependency curnel, and update curnel info.
+	cd /home/software
+	yum install -y (dependency asm)
+	yum install oracleasm-support-2.1.11-2.el7.x86_64.rpm -y
+	yum install oracleasmlib-2.0.12-1.el7.x86_64.rpm -y
+	
+	yum install kernel-uek-5.4.17-2136.323.1.el8uek.x86_64.rpm -y [dependency kernel install]
+	
+	rpm -qa | grep oracleasm [ oracleasm er je rpm gula install hoyeche sobgulo dekhte parbo]
+	
+	cat /etc/oracle-release [ oracle linux er version dekhbo]
+	
+	uname -r [ current curnel konta ase seta dekhabe]
+	
+	ls -l /boot/vmlinuz-* [ existion all curnel gulo dekhabe]
+	
+	grubby --set-default /boot/vmlinuz-5.4.17-2136.323.1.el8uek.x86_64 [current curnel chilo 5.15 amra ei command diye curnel change korlam 5.4 korlam]
+	
+	
+*** Now start GRID setup 
+	init 0 [shutdown kore 3 ti disk create korbo]
+	create disk = [Oracle_ASM_DATA01, Oracle_ASM_DATA02, Oracle_ASM_FRA = 15/20GB]
+	lsblk [sdb,sdc,sdd]
+	
+	* now partition this 3 disks
+	fdisk -l
+	fdisk /dev/sdb -> m, n, p, 1, w
+	lsblk
+	
+	ls -ltrh /dev/sd* [ ei command diye sobgulo sdb1,sdc1,sdd1 -> er disk er status dekhabe]
+	
+	oracleasm configure -i -> grid, asmadmin, y/y
+	oracleasm init;
+	
+	/usr/sbin/oracleasm status [ Checking if ASM is loaded: yes
+                                 Checking if /dev/oracleasm is mounted: yes ]
+
+	
+*** Now create Disk Groups
+	oracleasm createdisk DATA01 /dev/sdb1
+	oracleasm createdisk DATA02 /dev/sdc1
+	oracleasm createdisk FRA /dev/sdd1
+	
+	oracleasm listdisks [disk gulo dekhabe]
+	
+	
+	************ Password Less Key *************
+	su - grid
+	ssh-keygen -t rsa [srv1 and srv2 2 jaygay ie dibo]
+	ssh-copy-id grid@srv2.localdomain [srv1 and srv2]
+	ssh-copy-id grid@srv1.localdomain
+	
+	
+*** Now connect grid user and setup Grid Software
+	
+	su - grid
+	vi .bash_profile
+	
+# Grid Settings
+TMP=/tmp; export TMP
+TMPDIR=$TMP; export TMPDIR
+ORACLE_HOSTNAME=standby; export ORACLE_HOSTNAME
+ORACLE_UNQNAME=livedr; export ORACLE_UNQNAME
+ORACLE_BASE=/u01/app/grid; export ORACLE_BASE
+GRID_HOME=/u01/app/19.0.0.0/grid/; export GRID_HOME
+ORACLE_HOME=$GRID_HOME; export ORACLE_HOME
+ORACLE_SID=+ASM; export ORACLE_SID
+ORACLE_TERM=xterm; export ORACLE_TERM
+LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib; export LD_LIBRARY_PATH
+CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib; export CLASSPATH
+BASE_PATH=/usr/sbin:$PATH:$HOME/bin; export BASE_PATH
+PATH=$ORACLE_HOME/bin:$BASE_PATH; export PATH
+
+==============================
+
+# .bash_profile - for rac node-1
+
+if [ -f ~/.bashrc ]; then
+. ~/.bashrc
+fi
+ORACLE_SID=rac1; export ORACLE_SID
+TMP=/tmp; export TMP
+TMPDIR=$TMP; export TMPDIR
+ORACLE_HOSTNAME=rac1; export ORACLE_HOSTNAME
+ORACLE_UNQNAME=livedb; export ORACLE_UNQNAME
+ORACLE_BASE=/u01/app/grid; export ORACLE_BASE
+GRID_HOME=/u01/app/19.0.0.0/grid/; export GRID_HOME
+ORACLE_HOME=$GRID_HOME; export ORACLE_HOME
+NLS_DATE_FORMAT="DD-MON-YYYY HH24:MI:SS"; export NLS_DATE_FORMAT
+ORACLE_TERM=xterm; export ORACLE_TERM
+LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib; export LD_LIBRARY_PATH
+CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib; export CLASSPATH
+BASE_PATH=/usr/sbin:$PATH:$HOME/bin; export BASE_PATH
+PATH=$ORACLE_HOME/bin:$BASE_PATH; export PATH
+
+---------------------------
+
+=========== for extra oracle server for oracle software only 
+
+PATH=$PATH:$HOME/bin
+export PATH
+export ORACLE_SID=livedb
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
+export TNS_ADMIN=/u01/app/oracle/product/19.0.0.0/dbhome_1/network/admin
+export PATH=$ORACLE_HOME/bin:$PATH
+export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
+
+==========================================
+
+
+	cd $ORACLE_HOME
+	pwd
+	cd /home/software
+	unzip LINUX.X64_193000_grid_home.zip -d /u01/app/19.0.0.0/grid
+	
+	init 6
+	
+	su - grid
+	cd $ORACLE_HOME
+	ls
+	export CV_ASSUME_DISTID=OEL8.6
+	./gridSetup.sh
+
+	int 6
+	su - grid
+	. oraenv = +ASM
+	sqlplus / as sysasm
+	SELECT name, total_mb, free_mb FROM v$asm_diskgroup; [disk grup gula dekhabe]
+	select name,state,total_mb,path from v$ASM_DISK;
+	SELECT INSTANCE_NAME,VERSION,DATABASE_STATUS FROM V$INSTANCE;
+	SELECT NAME FROM V$DATAFILE;
+	
+	asmca [ekhon asmca diye +FRA disk group create korbo]
+	
+	
+	# ./crsctl status res -t [now check diskgroup,listener,asm sobkichur status dekhabe]
+	
+*** Now check ASM basic command ===========================================================================
+
+	su - grid
+	srvctl status asm
+	srvctl stop asm
+	srvctl status database -d livedb
+	srvctl stop database -d livedb
+	if cluster show db offline then -> srvctl enable database -d livedb
+	
+	
+	* difference between instance down vs database down???
+	
+	1) tail -f /u01/app/grid/diag/crs/testserver/crs/trace/alert.log
+	2) tail -f /u01/app/grid/diag/asm/+asm/+ASM/trace/alert_+ASM.log
+	3) tail -100 /u01/app/grid/diag/asm/+asm/+ASM/trace/alert_+ASM.log
+	
+	
+*** Now Create Oracle Database inside grid infrestucture
+	su - oracle
+	vi .bash_profile
+	
+# Oracle Settings
+export ORACLE_HOSTNAME=testserver
+export ORACLE_SID=livedb
+export ORACLE_UNQNAME=livedb
+export ORACLE_BASE=/u01/app/oracle
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1/
+export ORA_INVENTORY=/u01/app/oraInventory
+	
+	. .bash_profile
+	cd $ORACLE_HOME
+	pwd
+	cd /home/software
+	unzip LINUX.X64_193000_db_home.zip -d /u01/app/oracle/product/19.0.0.0/dbhome_1
+	
+	init 6
+	
+	su - oracle
+	cd $ORACLE_HOME
+	export CV_ASSUME_DISTID=OEL8.6
+	./runInstaller [ install software only ] 
+	
+	*** . oraenv (default home path diye dbca diye install korbo)
+		dbca 
+	
+	
+*** Successfully setup asm and grid software now chek some basic command for administration.
+
+	su - grid 
+	cd /u01/app/19.0.0.0/grid/bin
+	./crsctl status res -t
+	./crsctl stop crs -f [error dibe]
+			CRS-4013: This command is not supported in a single-node configuration.
+			CRS-4000: Command Stop failed, or completed with errors.
+
+	
+	tail -f /u01/app/oracle/diag/rdbms/livedb/livedb/trace/alert_livedb.log
+	
+
+*** Show +DATA and +FRA physical file
+	asmcmd 
+	
+
+*** create tablespace in asm grid infrestucture
+	su - grid
+	sqlplus / as sysasm
+	SELECT name, state FROM v$asm_diskgroup; [disk group er state dekhabe]
+	
+	su - oracle
+	sqlplus / as sysdba
+	SELECT name, total_mb, free_mb FROM v$asm_diskgroup; [disk group er free space dekhabe]
+	
+	CREATE TABLESPACE ALAMIN DATAFILE '+DATA' SIZE 500M AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED;
+	
+	
+
+
+
+***** check oracle listener 
+
+
+CREATE TABLESPACE INVENTORY DATAFILE '+DATA' SIZE 500M AUTOEXTEND ON NEXT 100M MAXSIZE UNLIMITED EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO;
+
+
+SHOW PARAMETER local_listener;
+SHOW PARAMETER remote_listener;
+SHOW PARAMETER service_names;
+
+ALTER SYSTEM SET LOCAL_LISTENER='(ADDRESS=(PROTOCOL=TCP)(HOST=10.55.66.187)(PORT=1521))' SCOPE=BOTH;
+
+-- তারপর registration চালাও
+ALTER SYSTEM REGISTER;
+
+grid = 
+lsnrctl services
+
+srvctl stop database -d livedb
+srvctl start database -d livedb
+
+ping -c 2 primary
+nslookup primary
+hostname -i
+
+G. Firewall/iptables চেক (যদি remote থেকে connect করতে পারছো না)
+sudo iptables -L -n | head
+# অথবা firewalld হলে
+sudo firewall-cmd --list-all
+
+
+
+
+****************************************************************
+
+২️⃣ Tablespace capacity বাড়ানোর দুটি পদ্ধতি
+Option A — এক datafile বড় করা (RESIZE)
+ALTER DATABASE DATAFILE '+DATA/LIVEDB/DATAFILE/inventory.267.1219406815' RESIZE 64G;
+
+
+✔ সুবিধা:
+
+File management সহজ, শুধু একটা file
+
+এক জায়গায় সব extent → fragment কম
+
+RAC/ASM এ centralized control
+
+❌ অসুবিধা:
+
+অনেক বড় file হলে restore/backups ধীর হতে পারে
+
+যদি কোনো কারণে file corrupt হয় → পুরো tablespace প্রভাবিত
+
+Option B — নতুন datafile যোগ করা (ADD DATAFILE)
+ALTER TABLESPACE INVENTORY
+ADD DATAFILE '+DATA' SIZE 32G AUTOEXTEND ON NEXT 100M MAXSIZE UNLIMITED;
+
+
+✔ সুবিধা:
+
+Tablespace capacity step-wise বাড়ানো যায়
+
+ছোট ছোট files → restore, backup, migration সহজ
+
+এক file corrupt হলে অন্য file-ok ক্ষতি হয় না
+
+❌ অসুবিধা:
+
+একাধিক file → management complexity বাড়ে
+
+small extents → fragment হতে পারে
+
+৩️⃣ Good practice
+
+ASM + RAC environment-এ সাধারণত Option B বেশি ব্যবহৃত হয় → অর্থাৎ, নতুন file যোগ করে step-wise capacity বাড়ানো।
+
+এক datafile বড় করা (Option A) করা যায়, কিন্তু বড় ফাইলের সাথে backup/restore ও corruption risk বেশি।
+
+Production DB-তে 32-64GB per datafile ঠিক থাকে, তার বেশি হলে নতুন file add করাই ভালো।
+	
