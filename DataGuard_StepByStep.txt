@@ -13,7 +13,6 @@ COLUMN seconds_in_wait FORMAT 99999
 COLUMN state FORMAT A20
 
 
-
 *** install vm and configure oracle linux:
 
 	sda           8:0    0   80G  0 disk
@@ -25,10 +24,14 @@ COLUMN state FORMAT A20
 	├─ol-var  252:3    0    5G  0 lvm  /var 5
 	└─ol-home 252:4    0   15G  0 lvm  /home 5
 	sr0          11:0    1 1024M  0 rom
+
+
+1. OS version কী?    -->  cat /etc/os-release
+2. Kernel version?  -->  uname -r
+3. RAM কত?   --> free -g
+4. Disk কত?  -->  df -h
 	
 	
-	
-cLAK*#o29
 
 * if edit vm networe then
 	i) connect putty
@@ -37,21 +40,6 @@ cLAK*#o29
 	iv) systemctl restart network
 	v) systemctl restart network.service
 	vi) ip addr
-
-
-
-PATH=$PATH:$HOME/bin
-export PATH=$ORACLE_HOME/bin:$PATH
-export PATH
-export ORACLE_HOSTNAME=hrms
-export ORACLE_SID=HRMS
-export ORACLE_UNQNAME=hrms
-export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
-export TNS_ADMIN=/u01/app/oracle/product/19.0.0.0/dbhome_1/network/admin
-export ORA_INVENTORY=/u01/app/oraInventory
-export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
-
-
 
 
 =========================================================================================================================== Overview DG
@@ -70,6 +58,7 @@ export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
 	10) ekhon rman auxlary te connect hobo -> rman TARGET sys/sys123@livedb AUXILIARY sys/sys123@livedbdr
 	11) ekhon primary and standby ay proyojonio parameter dibo then duplicate dibo. insaAllah data guard hoye jabe.
 
+
 =========================================================================================================================== PRIMARY
 
 *** first create primary database
@@ -85,7 +74,6 @@ export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
 * force logging yes	
 	select force_logging from v$database; (if force logging no then)
 	ALTER DATABASE FORCE LOGGING;
-	ALTER DATABASE FORCE LOGGING;
 
 ========================================================================================================================== STANDBY
 ******** Now Create STANDBY Database[software only] *********
@@ -93,7 +81,12 @@ export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
 	vi /etc/hosts
 	vi /etc/hostname
 	
-	yum search oracle [preinstall oracle $$ install dependency package from msWord] {
+	yum search oracle 
+
+	[preinstall oracle $$ install dependency package from msWord] {
+
+		yum install oracle-database-preinstall-19c.x86_64 -y
+
 		yum install -y bc    
 		yum install -y binutils
 		yum install -y compat-libcap1
@@ -141,45 +134,7 @@ export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
 		yum install -y libnsl2
 		yum install -y libnsl2.i686
 
-
-
-=======================================================================================================
-=======================================================================================================
-
-#.bash_profile SET KORAR NIOM : 
-
-# Oracle Environment Setup
-
-# ORACLE BASE & HOME
-export ORACLE_BASE=/u01/app/oracle
-export ORACLE_HOME=$ORACLE_BASE/product/19.0.0.0/dbhome_1
-
-# ORACLE SID & HOST
-export ORACLE_SID=HRMS
-export ORACLE_UNQNAME=hrms
-export ORACLE_HOSTNAME=hrms
-
-# PATH
-export PATH=$PATH:$HOME/bin
-export PATH=$ORACLE_HOME/bin:$PATH
-
-# NETWORK CONFIG
-export TNS_ADMIN=$ORACLE_HOME/network/admin
-export ORA_INVENTORY=/u01/app/oraInventory
-
-# NLS Settings
-export NLS_DATE_FORMAT="DD/MM/YYYY:HH24:MI:SS"
-
-# Prompt সুন্দর করার জন্য \u = ইউজারনেম, \h = হোস্টনেম, \W = কারেন্ট ডিরেক্টরি
-export PS1="[\u@\h \W]\$ "
-
-
-
-=======================================================================================================
-=======================================================================================================
-
-
-}
+	}
 	
 
 	vi /etc/selinux/config
@@ -221,6 +176,7 @@ export PS1="[\u@\h \W]\$ "
 	setup = livedr:/u01/app/oracle/product/19.0.0.0/dbhome_1:N
 	. oraenv = livedr 
 	
+
 *************** now go to primary database create pfile. then standby database startup this pfile. ************
 
 so need pfile and password file  
@@ -416,13 +372,14 @@ SID_LIST_LISTENER=
 				)
 			  )
 -------------------------------------------------------
+
 ENABLE_GLOBAL_DYNAMIC_ENDPOINT_LISTENER=ON
 VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON
 
 SID_LIST_LISTENER=
   (SID_LIST=
         (SID_DESC=
-          (SID_NAME=hrmsdr)
+          (SID_NAME=livedr)
           (ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1)
           ))
 
@@ -593,224 +550,109 @@ ADR_BASE_LISTENER = /u01/app/oracle
 	
 	SELECT value "Lag", datum_time "Received Time", Time_Computed "Time Computed " FROM V$DATAGUARD_STATS WHERE name like 'apply lag';	
 	
-	******************************************************************************************************************************************************
-	======================================================================================================================================================
-	=============================================== DUPLICATE COMMAND RESULT =============================================================================
-					[oracle@primary ~]$
-					[oracle@primary ~]$ rman TARGET sys/a123@livedb AUXILIARY sys/a123@livedr
 
-					Recovery Manager: Release 19.0.0.0.0 - Production on Tue Jan 7 03:30:07 2025
-					Version 19.3.0.0.0
 
-					Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
 
-					connected to target database: LIVEDB (DBID=3145439159)
-					connected to auxiliary database: LIVEDB (not mounted)
+======================================================================================================================================================
+======================================================================================================================================================
+=================================================   Multiple Standby Create    =======================================================================
+======================================================================================================================================================
+======================================================================================================================================================
 
-					RMAN> DUPLICATE TARGET DATABASE FOR STANDBY FROM ACTIVE DATABASE DORECOVER NOFILENAMECHECK;
 
-					Starting Duplicate Db at 07/01/2025:03:35:19
-					using target database control file instead of recovery catalog
-					allocated channel: ORA_AUX_DISK_1
-					channel ORA_AUX_DISK_1: SID=35 device type=DISK
-					current log archived
 
-					contents of Memory Script:
-					{
-					   backup as copy reuse
-					   passwordfile auxiliary format  '/u01/app/oracle/product/19.0.0.0/dbhome_1/dbs/orapwlivedr'   ;
-					}
-					executing Memory Script
-
-					Starting backup at 07/01/2025:03:35:20
-					allocated channel: ORA_DISK_1
-					channel ORA_DISK_1: SID=82 device type=DISK
-					Finished backup at 07/01/2025:03:35:23
-					duplicating Online logs to Oracle Managed File (OMF) location
-
-					contents of Memory Script:
-					{
-					   sql clone "alter system set  control_files =
-					  ''/u01/app/oracle/fast_recovery_area/LIVEDR/controlfile/o1_mf_mqsstbtr_.ctl'' comment=
-					 ''Set by RMAN'' scope=spfile";
-					   restore clone from service  'livedb' standby controlfile;
-					}
-					executing Memory Script
-
-					sql statement: alter system set  control_files =   ''/u01/app/oracle/fast_recovery_area/LIVEDR/controlfile/o1_mf_mqsstbtr_.ctl'' comment= ''Set by RMAN'' scope=spfile
-
-					Starting restore at 07/01/2025:03:35:23
-					using channel ORA_AUX_DISK_1
-
-					channel ORA_AUX_DISK_1: starting datafile backup set restore
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: restoring control file
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:01
-					output file name=/u01/app/oracle/fast_recovery_area/LIVEDR/controlfile/o1_mf_mqsstf5g_.ctl
-					Finished restore at 07/01/2025:03:35:26
-
-					contents of Memory Script:
-					{
-					   sql clone 'alter database mount standby database';
-					}
-					executing Memory Script
-
-					sql statement: alter database mount standby database
-					RMAN-05158: WARNING: auxiliary (datafile) file name /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_system_mqscopld_.dbf conflicts with a file used by the target database
-					RMAN-05158: WARNING: auxiliary (datafile) file name /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_sysaux_mqscpho6_.dbf conflicts with a file used by the target database
-					RMAN-05158: WARNING: auxiliary (datafile) file name /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_undotbs1_mqscpyr7_.dbf conflicts with a file used by the target database
-					RMAN-05158: WARNING: auxiliary (datafile) file name /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_users_mqscpzs5_.dbf conflicts with a file used by the target database
-					RMAN-05158: WARNING: auxiliary (tempfile) file name /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_temp_mqscrhp0_.tmp conflicts with a file used by the target database
-
-					contents of Memory Script:
-					{
-					   set newname for tempfile  1 to
-					 "/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_temp_mqscrhp0_.tmp";
-					   switch clone tempfile all;
-					   set newname for datafile  1 to
-					 "/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_system_mqscopld_.dbf";
-					   set newname for datafile  3 to
-					 "/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_sysaux_mqscpho6_.dbf";
-					   set newname for datafile  4 to
-					 "/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_undotbs1_mqscpyr7_.dbf";
-					   set newname for datafile  7 to
-					 "/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_users_mqscpzs5_.dbf";
-					   restore
-					   from  nonsparse   from service
-					 'livedb'   clone database
-					   ;
-					   sql 'alter system archive log current';
-					}
-					executing Memory Script
-
-					executing command: SET NEWNAME
-
-					renamed tempfile 1 to /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_temp_mqscrhp0_.tmp in control file
-
-					executing command: SET NEWNAME
-
-					executing command: SET NEWNAME
-
-					executing command: SET NEWNAME
-
-					executing command: SET NEWNAME
-
-					Starting restore at 07/01/2025:03:35:31
-					using channel ORA_AUX_DISK_1
-
-					channel ORA_AUX_DISK_1: starting datafile backup set restore
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: specifying datafile(s) to restore from backup set
-					channel ORA_AUX_DISK_1: restoring datafile 00001 to /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_system_mqscopld_.dbf
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:07
-					channel ORA_AUX_DISK_1: starting datafile backup set restore
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: specifying datafile(s) to restore from backup set
-					channel ORA_AUX_DISK_1: restoring datafile 00003 to /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_sysaux_mqscpho6_.dbf
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:03
-					channel ORA_AUX_DISK_1: starting datafile backup set restore
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: specifying datafile(s) to restore from backup set
-					channel ORA_AUX_DISK_1: restoring datafile 00004 to /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_undotbs1_mqscpyr7_.dbf
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:01
-					channel ORA_AUX_DISK_1: starting datafile backup set restore
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: specifying datafile(s) to restore from backup set
-					channel ORA_AUX_DISK_1: restoring datafile 00007 to /u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_users_mqscpzs5_.dbf
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:01
-					Finished restore at 07/01/2025:03:35:43
-
-					sql statement: alter system archive log current
-					current log archived
-
-					contents of Memory Script:
-					{
-					   restore clone force from service  'livedb'
-							   archivelog from scn  2356201;
-					   switch clone datafile all;
-					}
-					executing Memory Script
-
-					Starting restore at 07/01/2025:03:35:43
-					using channel ORA_AUX_DISK_1
-
-					channel ORA_AUX_DISK_1: starting archived log restore to default destination
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: restoring archived log
-					archived log thread=1 sequence=11
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:01
-					channel ORA_AUX_DISK_1: starting archived log restore to default destination
-					channel ORA_AUX_DISK_1: using network backup set from service livedb
-					channel ORA_AUX_DISK_1: restoring archived log
-					archived log thread=1 sequence=12
-					channel ORA_AUX_DISK_1: restore complete, elapsed time: 00:00:01
-					Finished restore at 07/01/2025:03:35:45
-
-					datafile 1 switched to datafile copy
-					input datafile copy RECID=1 STAMP=1189740945 file name=/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_system_mqscopld_.dbf
-					datafile 3 switched to datafile copy
-					input datafile copy RECID=2 STAMP=1189740945 file name=/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_sysaux_mqscpho6_.dbf
-					datafile 4 switched to datafile copy
-					input datafile copy RECID=3 STAMP=1189740945 file name=/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_undotbs1_mqscpyr7_.dbf
-					datafile 7 switched to datafile copy
-					input datafile copy RECID=4 STAMP=1189740945 file name=/u01/app/oracle/oradata/LIVEDB/datafile/o1_mf_users_mqscpzs5_.dbf
-
-					contents of Memory Script:
-					{
-					   set until scn  2356333;
-					   recover
-					   standby
-					   clone database
-						delete archivelog
-					   ;
-					}
-					executing Memory Script
-
-					executing command: SET until clause
-
-					Starting recover at 07/01/2025:03:35:46
-					using channel ORA_AUX_DISK_1
-
-					starting media recovery
-
-					archived log for thread 1 with sequence 11 is already on disk as file /u01/app/oracle/fast_recovery_area/1_11_1189726521.dbf
-					archived log for thread 1 with sequence 12 is already on disk as file /u01/app/oracle/fast_recovery_area/1_12_1189726521.dbf
-					archived log file name=/u01/app/oracle/fast_recovery_area/1_11_1189726521.dbf thread=1 sequence=11
-					archived log file name=/u01/app/oracle/fast_recovery_area/1_12_1189726521.dbf thread=1 sequence=12
-					media recovery complete, elapsed time: 00:00:00
-					Finished recover at 07/01/2025:03:35:46
-
-					contents of Memory Script:
-					{
-					   delete clone force archivelog all;
-					}
-					executing Memory Script
-
-					released channel: ORA_DISK_1
-					released channel: ORA_AUX_DISK_1
-					allocated channel: ORA_DISK_1
-					channel ORA_DISK_1: SID=82 device type=DISK
-					deleted archived log
-					archived log file name=/u01/app/oracle/fast_recovery_area/1_11_1189726521.dbf RECID=1 STAMP=1189740943
-					deleted archived log
-					archived log file name=/u01/app/oracle/fast_recovery_area/1_12_1189726521.dbf RECID=2 STAMP=1189740944
-					Deleted 2 objects
-
-					Finished Duplicate Db at 07/01/2025:03:35:49
-
-					RMAN>
-					RMAN>
-					RMAN>
-					RMAN>
-					
-					
-					
-=============================================== END DUPLICATE COMMAND ===============================================================================
 ******************************************************************************************************************************************************
-======================================================================================================================================================					
+***************************** 1) Primary Server Add Listener side ************************************************************************************
+
+
+🔹 বিষয়টা কিভাবে কাজ করে?
+
+Oracle 19c তে database instance start হলেই সে নিজে থেকে listener এ  register হয় (dynamic registration)।
+
+তুমি primary তে Listener e যেটা দিছো:
+
+SID_LIST_LISTENER=
+  (SID_LIST=
+        (SID_DESC=
+          (SID_NAME=livedrtwo)
+          (ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1)
+          ))
+
+*** এটা আসলে static registration।
+
+👉 Static registration লাগে সাধারণত:
+
+RMAN duplicate সময়
+
+Database down থাকলেও connect দরকার হলে
+
+Data Guard broker কিছু ক্ষেত্রে
+
+
+
+
+******************************************************************************************************************************************************
+***************************** 2) Primary Server Add Listener side ************************************************************************************
+
+*** primary and standbytwo 2 ta server er tns ay 2 server ay 2 ta entry dite hobe.
+
+
+
+
+******************************************************************************************************************************************************
+*****************************  3)  Primary Database Command For add 2nd Standby database for data guard **************************************************
+
+
+select GROUP#,SEQUENCE#,STATUS from v$standby_log;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo1.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_tworedo2.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo3.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo4.log') size 200m;
+
+ALTER SYSTEM SET DB_UNIQUE_NAME='livedb' SCOPE=SPFILE;
+
+alter system set log_archive_config='DG_CONFIG=(livedb,livedr,livedrtwo)'scope=spfile;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_3='SERVICE=livedrtwo ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedrtwo' scope=spfile;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_3='ENABLE' SCOPE=SPFILE;
+
+alter system set db_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDRTWO' scope=spfile;  
+
+alter system set log_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDRTWO' scope=spfile;
+
+alter system set FAL_SERVER='LIVEDR,LIVEDRTWO' SCOPE=SPFILE;
+
+
+
+
+
+
+******************************************************************************************************************************************************
+*****************************  4)  2nd Standby Database LIVEDRTWO Command for data guard *************************************************************					
+						
+
+ALTER SYSTEM SET DB_UNIQUE_NAME='livedrtwo' SCOPE=SPFILE;
+
+alter system set log_archive_config='DG_CONFIG=(livedb,livedrtwo)'scope=spfile;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=/u01/app/oracle/fra VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedrtwo' scope=spfile;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedb ASYNC VALID_FOR=(ALL_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+
+ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
+
+ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
+
+alter system set FAL_CLIENT='LIVEDRTWO' SCOPE=SPFILE;
+
+alter system set FAL_SERVER='LIVEDB' SCOPE=SPFILE;				
 					
 				
 					
 						
-
 
