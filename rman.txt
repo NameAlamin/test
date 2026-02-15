@@ -535,6 +535,14 @@ RUN {
 
 4) crontab -e
 	38 11 * * * /etc/cron.daily/rman.sh [crontab -e er vitore ei time ta bole dilam]
+
+	*  *  *  *  *  command
+	|  |  |  |  |
+	|  |  |  |  └── সপ্তাহের দিন (0-7)
+	|  |  |  └──── মাস (1-12)
+	|  |  └────── মাসের দিন (1-31)
+	|  └──────── ঘন্টা (0-23)
+	└────────── মিনিট (0-59)
 	
 5) systemctl restart crond.service
 
@@ -584,3 +592,4 @@ RELEASE CHANNEL d2;
 }
 EOF
 echo "Backup is end"
+
