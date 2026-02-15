@@ -593,3 +593,53 @@ RELEASE CHANNEL d2;
 EOF
 echo "Backup is end"
 
+=======================================================================================================================
+
+
+✅ 🔵 Level 0 Backup (Full Backup) – Separate FORMAT সহ
+
+RUN {
+    ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+    BACKUP INCREMENTAL LEVEL 0 DATABASE
+    FORMAT '/u01/auto_backup/L0_db_%d_%T_%U.bkp';
+
+    BACKUP ARCHIVELOG ALL
+    FORMAT '/u01/auto_backup/L0_arch_%d_%T_%U.bkp'
+    DELETE INPUT;
+
+    RELEASE CHANNEL ch1;
+}
+
+
+এখন file name হবে এরকম:
+
+L0_db_KNIT_HRMS_20260215_xxxxx.bkp
+L0_arch_KNIT_HRMS_20260215_xxxxx.bkp
+
+
+
+=========================================================================================================================
+
+
+
+✅ 🟢 Level 1 Backup (Incremental Backup)
+
+RUN {
+    ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+    BACKUP INCREMENTAL LEVEL 1 DATABASE
+    FORMAT '/u01/auto_backup/L1_db_%d_%T_%U.bkp';
+
+    BACKUP ARCHIVELOG ALL
+    FORMAT '/u01/auto_backup/L1_arch_%d_%T_%U.bkp'
+    DELETE INPUT;
+
+    RELEASE CHANNEL ch1;
+}
+
+
+এখন file হবে:
+
+L1_db_KNIT_HRMS_20260216_xxxxx.bkp
+L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
