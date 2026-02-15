@@ -643,3 +643,26 @@ RUN {
 
 L1_db_KNIT_HRMS_20260216_xxxxx.bkp
 L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
+
+
+
+
+
+========================== Change Time Zone   ========================================================================
+
+date
+
+timedatectl
+
+sudo timedatectl set-ntp true
+
+systemctl status chronyd
+যদি inactive থাকে:
+sudo systemctl start chronyd
+sudo systemctl enable chronyd
+
+sudo chronyc makestep
+
+
+[ VM ay time zone change kore bangladesh korbo ]
+
