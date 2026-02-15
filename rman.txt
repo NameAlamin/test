@@ -1,3 +1,4 @@
+
 *** first enable archive log mode
 	archive log list
 	shutdown immediate
@@ -379,124 +380,7 @@ RMAN-06054: media recovery requesting unknown archived log for thread 1 with seq
 
 *****************************************************************************************************************************************
 *****************************************************************************************************************************************
-********************************************************************************************************************************************************************************
-
-
-
-
-
-
-
-
--------------------------
-
-
-[root@primary ~]# vi /etc/cron
-cron.d/       cron.daily/   cron.deny     cron.hourly/  cron.monthly/ crontab       cron.weekly/
-[root@primary ~]# vi /etc/cron.d
-cron.d/     cron.daily/ cron.deny
-[root@primary ~]# vi /etc/cron.daily/rman.sh
-
-
-[root@primary ~]# cd /etc/cron.daily/
-[root@primary cron.daily]# ls
-logrotate  rman.sh
-[root@primary cron.daily]# ls -la
-total 20
-drwxr-xr-x.   2 root root   38 Jan  9 00:30 .
-drwxr-xr-x. 146 root root 8192 Jan  8 23:53 ..
--rwxr-xr-x.   1 root root  189 Jan  4  2018 logrotate
--rw-r--r--.   1 root root  163 Jan  9 00:30 rman.sh
-[root@primary cron.daily]# chown -R oracle:oinstall rman.sh
-
-
-[root@primary cron.daily]#
-[root@primary cron.daily]#
-[root@primary cron.daily]#
-[root@primary cron.daily]# ls -la
-total 20
-drwxr-xr-x.   2 root   root       38 Jan  9 00:30 .
-drwxr-xr-x. 146 root   root     8192 Jan  8 23:53 ..
--rwxr-xr-x.   1 root   root      189 Jan  4  2018 logrotate
--rw-r--r--.   1 oracle oinstall  163 Jan  9 00:30 rman.sh
-
-
-
-[root@primary cron.daily]# crontab -e
-no crontab for root - using an empty one
-crontab: installing new crontab
-
-
-[root@primary cron.daily]# date
-Thu Jan  9 00:33:31 EST 2025
-
-
-[root@primary cron.daily]# date
-Thu Jan  9 00:35:37 EST 2025
-
-
-[root@primary cron.daily]# date
-Thu Jan  9 00:36:01 EST 2025
-[root@primary cron.daily]# date
-Thu Jan  9 11:36:49 +06 2025
-[root@primary cron.daily]# crontab -e
-crontab: installing new crontab
-
-
-[root@primary cron.daily]# systemctl restart crond.service
-[root@primary cron.daily]# tail -f /var/lo
-local/ lock/  log/
-[root@primary cron.daily]# tail -f /var/log/cron
-Jan  9 00:33:24 primary crontab[8557]: (root) END EDIT (root)
-Jan  9 00:36:55 primary crontab[9058]: (root) BEGIN EDIT (root)
-Jan  9 00:37:08 primary crontab[9058]: (root) REPLACE (root)
-Jan  9 00:37:08 primary crontab[9058]: (root) END EDIT (root)
-Jan  9 00:37:26 primary crond[1615]: (CRON) INFO (Shutting down)
-Jan  9 00:37:26 primary crond[9123]: (CRON) STARTUP (1.5.2)
-Jan  9 00:37:26 primary crond[9123]: (CRON) INFO (Syslog will be used instead of sendmail.)
-Jan  9 00:37:26 primary crond[9123]: (CRON) INFO (RANDOM_DELAY will be scaled with factor 49% if used.)
-Jan  9 00:37:26 primary crond[9123]: (CRON) INFO (running with inotify support)
-Jan  9 00:37:26 primary crond[9123]: (CRON) INFO (@reboot jobs will be run at computer's startup.)
-Jan  9 00:38:01 primary CROND[9173]: (root) CMD (/etc/cron.daily/rman.sh)
-Jan  9 00:38:01 primary CROND[9171]: (root) CMDOUT (/bin/sh: /etc/cron.daily/rman.sh: Permission denied)
-
-
-
-
-===========================================================================================
-
-vi rman.sh 
-
-	
-date=$(date +"%y_%m_%d_%H:%M")	
-echo "Backup is starting $date"
-
-rman target / <<EOF > /u01/app/oracle/fra/backup_status_$date
-
-RUN
-{
-ALLOCATE CHANNEL ch1 TYPE DISK
-ALLOCATE CHANNEL ch2 TYPE DISK
-BACKUP
-FORMAT '/u01/app/oracle/fra/%d_D_%T_%u_s%s_p%p'
-INCREMENTAL LEVEL 0 DATABASE
-CURRENT CONTROLFILE 
-FORMAT '/u01/app/oracle/fra/%d_C_%T_%u'
-SPFILE 
-FORMAT '/u01/app/oracle/fra/%d_S_%T_%u'
-PLUS ARCHIVELOG
-FORMAT '/u01/app/oracle/fra/%d_S_%T_%u'
-RELEASE CHANNEL ch1;
-RELEASE CHANNEL ch2;
-}
-EOF
-echo "Please check log file for backup status" | mailx -s "RMAN Backup status" -a /u01/rman/backup_status_$date alamin8740@gmail.com
-	
-
-chmod +x rman.sh 
-
-bash rman.sh
-
+*****************************************************************************************************************************************
 
 
 
@@ -511,28 +395,39 @@ bash rman.sh
 	chmod 775 rman.sh
 	
 3) vi rman.sh
-	# rman_backup_script.rman
 	
-export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
-export ORACLE_SID=livedb
-export PATH=$ORACLE_HOME/bin:$PATH
-BACKUP_DIR=/u01/rman_backup
-	
-rman target / 
-RUN {
-	# Allocate channels
-	# ALLOCATE CHANNEL ch1 DEVICE TYPE DISK FORMAT '$BACKUP_DIR/full_backup_$TIMESTAMP_%U';
-	ALLOCATE CHANNEL ch1
+	#!/bin/bash
+	date=$(date +"%y_%m_%d_%H:%M")
+	echo "Backup is starting $date"
 
-	# Perform the backup
-	BACKUP DATABASE PLUS ARCHIVELOG;
+	export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
+	export ORACLE_SID=KNIT_HRMS
+	export PATH=$ORACLE_HOME/bin:$PATH
 
-	# Release channels
-	RELEASE CHANNEL ch1;
-}
+	BACKUP_DIR=/u01/rman_backup
+	LOG_FILE=$BACKUP_DIR/rman_$(date +%Y%m%d_%H%M).log
+
+	$ORACLE_HOME/bin/rman target sys/sys123@KNIT_HRMS  <<EOF >> $LOG_FILE 2>&1
+
+	RUN {
+		ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+		BACKUP INCREMENTAL LEVEL 0 DATABASE
+		FORMAT '/u01/rman_backup/L0_db_%d_%T_%U.bkp';
+
+		BACKUP ARCHIVELOG ALL
+		FORMAT '/u01/rman_backup/L0_arch_%d_%T_%U.bkp'
+		DELETE INPUT;
+
+		RELEASE CHANNEL ch1;
+	}
+
+	EXIT;
+	EOF
+	echo "Backup is end"
+
 
 		
-
 4) crontab -e
 	38 11 * * * /etc/cron.daily/rman.sh [crontab -e er vitore ei time ta bole dilam]
 
@@ -544,9 +439,38 @@ RUN {
 	|  └──────── ঘন্টা (0-23)
 	└────────── মিনিট (0-59)
 	
+	
 5) systemctl restart crond.service
 
+
 6) tail -f /var/log/cron [log dekhabe]
+
+
+
+======================================= level 0 backup =============================================================
+
+✅ 🔵 Level 0 Backup (Full Backup) – Separate FORMAT সহ
+
+RUN {
+    ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+    BACKUP INCREMENTAL LEVEL 0 DATABASE
+    FORMAT '/u01/auto_backup/L0_db_%d_%T_%U.bkp';
+
+    BACKUP ARCHIVELOG ALL
+    FORMAT '/u01/auto_backup/L0_arch_%d_%T_%U.bkp'
+    DELETE INPUT;
+
+    RELEASE CHANNEL ch1;
+}
+
+
+এখন file name হবে এরকম:
+
+L0_db_KNIT_HRMS_20260215_xxxxx.bkp
+L0_arch_KNIT_HRMS_20260215_xxxxx.bkp
+
+
 
 ======================================= level 0 backup =============================================================
 date=$(date +"%y_%m_%d_%H:%M")
@@ -593,34 +517,8 @@ RELEASE CHANNEL d2;
 EOF
 echo "Backup is end"
 
-=======================================================================================================================
-
-
-✅ 🔵 Level 0 Backup (Full Backup) – Separate FORMAT সহ
-
-RUN {
-    ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
-
-    BACKUP INCREMENTAL LEVEL 0 DATABASE
-    FORMAT '/u01/auto_backup/L0_db_%d_%T_%U.bkp';
-
-    BACKUP ARCHIVELOG ALL
-    FORMAT '/u01/auto_backup/L0_arch_%d_%T_%U.bkp'
-    DELETE INPUT;
-
-    RELEASE CHANNEL ch1;
-}
-
-
-এখন file name হবে এরকম:
-
-L0_db_KNIT_HRMS_20260215_xxxxx.bkp
-L0_arch_KNIT_HRMS_20260215_xxxxx.bkp
-
-
 
 =========================================================================================================================
-
 
 
 ✅ 🟢 Level 1 Backup (Incremental Backup)
@@ -638,13 +536,10 @@ RUN {
     RELEASE CHANNEL ch1;
 }
 
-
 এখন file হবে:
 
 L1_db_KNIT_HRMS_20260216_xxxxx.bkp
 L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
-
-
 
 
 
