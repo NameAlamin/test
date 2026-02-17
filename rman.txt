@@ -1,4 +1,370 @@
 
+=============================================================  যা করা যাবে না  ============================================================= 
+
+	সাধারণত ৩টা কারণে হয়:
+
+	1) FRA থেকে archive log manual delete করা যাবে না
+	2) rm -rf দিয়ে delete করলে control file জানে না যে ফাইল নাই
+	3) FRA auto clean করেছে কিন্তু metadata mismatch হয়েছে
+
+	*** Control file এ archive log record আছে, কিন্তু physical file নাই। 
+
+	✅ এখন কী করবে? (Production Safe Solution)
+
+	RMAN> crosscheck archivelog all;  ---> এটা RMAN কে বলবে: “যা যা archive log আছে বলে জানো, OS এ গিয়ে চেক করো”
+
+	RMAN> delete expired archivelog all;  --->  এতে control file থেকে  missing log গুলোর reference remove হবে।
+
+	RMAN> Exit    |      rman target /
+	
+	RMAN> backup database plus archivelog;
+
+
+    ⚠️ তুমি কি manual ভাবে FRA থেকে archive log delete করেছো? যদি করে থাকো — future এ কখনো rm দিয়ে archive delete করবে না ❌ সবসময় RMAN দিয়ে:
+
+	delete archivelog all completed before 'sysdate-1';	
+
+
+
+
+=============================================================  ব্যাকআপ নিতে যা যা করা লাগবে?  ============================================================= 
+
+
+	খুব ভালো চিন্তা করছো 👍 Production safe রাখতে হলে শুধু backup নেওয়া না — ঠিকভাবে সাজিয়ে রাখা, retain করা, আর test করা equally গুরুত্বপূর্ণ।
+
+	তুমি এখন /u01/rman_backup এ Level 0 নিচ্ছো। এটা কাজ করবে, কিন্তু best practice একটু structured হওয়া উচিত।
+
+	সাধারণভাবে production এ এভাবে রাখা হয়:
+
+	🔵 Weekly Level 0 (Full)
+	🟢 Daily Level 1 (Incremental)
+	🟡 Frequent Archivelog Backup (প্রতি ১–২ ঘন্টা)
+
+
+	Example Schedule:
+
+	Day             Backup
+	-------         ---------	        
+	Sunday	        Level 0
+	Mon–Sat	        Level 1
+	Every 1–2 hr	Archivelog
+
+
+
+	📁 Folder Structure – Best Practice
+
+	Recommended structure:
+
+	/u01/rman_backup/
+		├── L0/
+		├── L1/
+		├── ARCH/
+		└── CONTROLFILE/
+
+
+	✅ Level 0 Script (Weekly)
+	RUN {
+	ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+	BACKUP INCREMENTAL LEVEL 0 DATABASE
+	FORMAT '/u01/rman_backup/L0/L0_db_%d_%T_%U.bkp';
+
+	BACKUP ARCHIVELOG ALL
+	FORMAT '/u01/rman_backup/ARCH/L0_arch_%d_%T_%U.bkp'
+	DELETE INPUT;
+
+	BACKUP CURRENT CONTROLFILE
+	FORMAT '/u01/rman_backup/CONTROLFILE/ctl_%d_%T_%U.bkp';
+
+	RELEASE CHANNEL ch1;
+	}
+
+
+	✅ Level 1 Script (Daily)
+	RUN {
+	ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+	BACKUP INCREMENTAL LEVEL 1 DATABASE
+	FORMAT '/u01/rman_backup/L1/L1_db_%d_%T_%U.bkp';
+
+	BACKUP ARCHIVELOG ALL
+	FORMAT '/u01/rman_backup/ARCH/L1_arch_%d_%T_%U.bkp'
+	DELETE INPUT;
+
+	RELEASE CHANNEL ch1;
+	}
+
+
+	🔥 Important Configuration (Must Do in Production)
+
+	1️. Retention Policy Set করো
+	CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF 7 DAYS;  ---> মানে ৭ দিনের আগের obsolete backup delete করা যাবে।
+
+	2️. Controlfile Autobackup ON করো:
+	RMAN> CONFIGURE CONTROLFILE AUTOBACKUP ON;     --->  এটা না করলে বিপদ হবে।
+
+	3️. Backup Optimization ON করো: 
+	RMAN> CONFIGURE BACKUP OPTIMIZATION ON;
+	
+	🔹 BACKUP OPTIMIZATION ON করলে লাভ কী?
+
+		ধরো: একই archivelog আগে backup হয়েছে Data Guard standby তে already shipped হয়েছে
+
+		তখন optimization ON থাকলে RMAN:
+
+		✔ Already backed up file আবার backup করবে না
+		✔ Time বাঁচাবে
+		✔ Disk space বাঁচাবে
+
+		Production এ এটা ON রাখা উচিত।
+
+	🎯 CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF 7 DAYS;
+
+		এর মানে কী?
+		👉 RMAN নিশ্চিত করবে যে তুমি গত ৭ দিনের যেকোনো দিন পর্যন্ত database recover করতে পারবে।
+		এটা সরাসরি “৭ দিনের পুরানো backup delete” করে না।
+
+
+	🚨 Production Safety Checklist
+
+	✔ FRA size monitor করো
+	✔ Backup location আলাদা disk এ রাখো (database disk এ না রাখাই ভালো)
+	✔ Monthly restore test করো
+	✔ crosscheck cron এ রাখো
+	✔ OS level delete কখনো করো না
+
+	🧠 Enterprise Level Best Practice
+
+			Minimum করো:
+
+			Weekly L0
+			Daily L1
+			Hourly archivelog
+			7–14 days retention
+			Separate disk mount (যদি সম্ভব হয়)
+
+
+========================================================================================================================================
+
+
+
+	✅ Step-1: ১ ঘণ্টা পরপর Archivelog Backup কীভাবে নেবে?
+
+		এটার জন্য cron job ব্যবহার করাই standard practice (Linux server এ)।
+
+	🔹 ১. Archivelog Backup Script বানাও
+
+		ধরা যাক script নাম: /home/oracle/arch_backup.sh
+
+		#!/bin/bash
+
+		export ORACLE_SID=KNIT_HRMS
+		export ORACLE_HOME=/u01/app/oracle/product/19c/dbhome_1
+		export PATH=$ORACLE_HOME/bin:$PATH
+
+		rman target / <<EOF
+
+		RUN {
+			ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
+
+			BACKUP
+			ARCHIVELOG ALL
+			NOT BACKED UP 1 TIMES
+			FORMAT '/u01/rman_backup/ARCH/arch_%d_%s_%U.bkp';
+
+			RELEASE CHANNEL ch1;
+		}
+
+
+		EXIT;
+		EOF
+
+		*** RMAN> CONFIGURE BACKUP OPTIMIZATION ON; জেহেতু OPTIMIZATION ON তাই DELETE INPUT; করা লাগবে না। একই লগ দ্বিতীয় বার ব্যাক
+
+		*** jodi dekhte chai kon backup ay kon sequence theke kon sequence porjonto ase 
+		LIST BACKUP OF ARCHIVELOG ALL;
+		
+		*** policy add korte hobe --> archive log backup na hole delete kora jabe na fra theke.
+
+		Permission দাও:
+
+		chmod +x /home/oracle/arch_backup.sh
+
+	🔹 ২. Cron এ সেট করো (প্রতি ১ ঘণ্টা)
+		crontab -e
+
+
+	এটা যোগ করো:
+
+		0 * * * * /home/oracle/arch_backup.sh >> /home/oracle/arch_backup.log 2>&1
+
+
+	মানে: প্রতি ঘণ্টার ০ মিনিটে run হবে।
+
+		✔ এটাই production standard way।
+
+	
+	
+	
+	✅ Step-2: CONFIGURE command কোথা থেকে দিবে?
+
+		এই command গুলো SQL*Plus থেকে না ❌
+		RMAN থেকে দিতে হবে ✔
+
+		এভাবে:
+
+		rman target /
+
+		তারপর:
+		CONFIGURE CONTROLFILE AUTOBACKUP ON;
+		CONFIGURE BACKUP OPTIMIZATION ON;
+
+	🔹 CONTROLFILE backup /CONTROLFILE/ folder এ কীভাবে যাবে?
+	
+		Default এ এটা FRA তে যায়।
+		তুমি চাইলে location configure করতে পারো:
+
+		CONFIGURE CONTROLFILE AUTOBACKUP FORMAT FOR DEVICE TYPE DISK
+		TO '/u01/rman_backup/CONTROLFILE/ctl_%d_%T_%F.bkp';
+
+
+		এখন থেকে controlfile auto backup ওই folder এ যাবে।
+
+	
+
+	🟢 3 Copies of Data
+
+		তোমার data এর ৩টা copy থাকতে হবে:
+
+		Live database
+
+		Local backup
+
+		Offsite backup
+
+	🟢 2️ Different Media
+
+		Backup দুই ধরনের storage এ রাখতে হবে:
+
+		Disk
+
+		NFS / Tape / Cloud
+
+		কারণ একই disk crash করলে সব শেষ হয়ে যাবে।
+
+	🟢 3️ Offsite Copy
+
+		একটা copy অন্য location এ থাকতে হবে।
+
+		Example:
+
+		Primary server Dhaka
+
+		Backup copy Tangail / Cloud
+
+		যদি পুরো data center আগুনে পুড়ে যায় — তবুও data থাকবে।
+
+	🔥 Enterprise Setup Example
+	
+	Copy	                Location
+   ------                  -----------
+	Live DB	                Local Disk
+	Backup 1	            Local Backup Disk
+	Backup 2	            NFS Server
+	Backup 3	            AWS S3 / Tape
+	
+	🎯 তোমার বর্তমান setup এ Minimum কী করা উচিত?
+
+	যদি ছোট production হয়:
+
+	✔ /u01/rman_backup আলাদা mount হওয়া উচিত
+	✔ সপ্তাহে ১বার অন্য server এ rsync করো
+	✔ Monthly restore test করো
+
+	⚠️ সবচেয়ে বড় ভুল DBAরা করে
+
+	Backup নেয়
+	কিন্তু restore test করে না ❌
+
+	Backup = Valid only if restore works.
+	
+	
+
+
+
+=============================================================  Intrview  ============================================================= 
+	
+	
+	🔥 পুরো flow diagram
+		Archive Logs (.arc files)
+				↓
+		RMAN BACKUP command
+				↓
+		Backup Set (Logical Group)
+				↓
+		Backup Piece (.bkp physical file)
+				↓
+		Stored in Disk (/u01/rman_backup/)
+
+	❓ Q1: What is the difference between Backup Set and Backup Piece?
+	✅ Answer:
+
+	Backup Set is a logical grouping of files backed up by RMAN.
+	Backup Piece is the physical file written to disk or tape containing the backup set data.
+
+	❓ Q2: Can one backup piece contain multiple archive logs?
+	✅ Answer:
+
+	Yes. By default RMAN groups multiple archive logs into a single backup set, which is written as one or more backup pieces.
+
+	❓ Q3: How do you make one archive log per backup piece?
+	✅ Answer:
+
+	Use:
+
+	BACKUP ARCHIVELOG ALL FILESPERSET 1;
+
+
+	This forces RMAN to create one backup set per archived log.
+
+	❓ Q4: How do you check which archive logs are inside a backup piece?
+	✅ Answer:
+	LIST BACKUP OF ARCHIVELOG ALL;
+
+
+	or
+
+	LIST BACKUPSET <key>;
+
+	❓ Q5: Where does RMAN store backup metadata?
+	✅ Answer:
+
+	Control file (default)
+
+	Or Recovery Catalog (optional centralized repository)
+
+	❓ Q6: What happens during RESTORE ARCHIVELOG?
+	✅ Answer:
+
+	RMAN reads the backup piece → extracts the backup set → recreates the original archive log files.
+
+	❓ Q7: In Data Guard, what happens if archive log is missing?
+	✅ Answer:
+
+	Standby apply will stop with gap error.
+	We must restore the missing archive log or perform incremental roll forward.
+
+	🎯 Interview Gold Line (Must Say)
+
+	"Backup set is a logical structure maintained by RMAN, whereas backup piece is the actual physical file stored on disk or tape."
+
+
+
+
+
+=============================================================  Lab Practice  ============================================================= 
+
+
 *** first enable archive log mode
 	archive log list
 	shutdown immediate
@@ -455,10 +821,10 @@ RUN {
     ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
 
     BACKUP INCREMENTAL LEVEL 0 DATABASE
-    FORMAT '/u01/auto_backup/L0_db_%d_%T_%U.bkp';
+    FORMAT '/u01/rman_backup/L0_db_%d_%T_%U.bkp';
 
     BACKUP ARCHIVELOG ALL
-    FORMAT '/u01/auto_backup/L0_arch_%d_%T_%U.bkp'
+    FORMAT '/u01/rman_backup/L0_arch_%d_%T_%U.bkp'
     DELETE INPUT;
 
     RELEASE CHANNEL ch1;
@@ -471,53 +837,6 @@ L0_db_KNIT_HRMS_20260215_xxxxx.bkp
 L0_arch_KNIT_HRMS_20260215_xxxxx.bkp
 
 
-
-======================================= level 0 backup =============================================================
-date=$(date +"%y_%m_%d_%H:%M")
-echo "Backup is starting $date"
-
-export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
-export ORACLE_SID=testdb
-export PATH=$ORACLE_HOME/bin:$PATH
-
-rman TARGET sys/a123@livedb <<EOF > /etc/cron.daily/daily_backup_log/backup_status_$date
-
-RUN
-{
-ALLOCATE CHANNEL d1 DEVICE TYPE disk;
-ALLOCATE CHANNEL d2 DEVICE TYPE disk;
-backup incremental level 0 database plus archivelog;
-RELEASE CHANNEL d1;
-RELEASE CHANNEL d2;
-}
-EOF
-echo "Backup is end"
-
-
-
-======================================= level 1 backup =============================================================
-
-date=$(date +"%y_%m_%d_%H:%M")
-echo "Backup is starting $date"
-
-export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
-export ORACLE_SID=livedb
-export PATH=$ORACLE_HOME/bin:$PATH
-
-rman TARGET sys/sys@testdb <<EOF > /etc/cron.daily/daily_backup_log/backup_status_$date
-
-RUN
-{
-ALLOCATE CHANNEL d1 DEVICE TYPE disk;
-ALLOCATE CHANNEL d2 DEVICE TYPE disk;
-backup incremental level 1 database plus archivelog;
-RELEASE CHANNEL d1;
-RELEASE CHANNEL d2;
-}
-EOF
-echo "Backup is end"
-
-
 =========================================================================================================================
 
 
@@ -527,10 +846,10 @@ RUN {
     ALLOCATE CHANNEL ch1 DEVICE TYPE DISK;
 
     BACKUP INCREMENTAL LEVEL 1 DATABASE
-    FORMAT '/u01/auto_backup/L1_db_%d_%T_%U.bkp';
+    FORMAT '/u01/rman_backup/L1_db_%d_%T_%U.bkp';
 
     BACKUP ARCHIVELOG ALL
-    FORMAT '/u01/auto_backup/L1_arch_%d_%T_%U.bkp'
+    FORMAT '/u01/rman_backup/L1_arch_%d_%T_%U.bkp'
     DELETE INPUT;
 
     RELEASE CHANNEL ch1;
@@ -540,6 +859,138 @@ RUN {
 
 L1_db_KNIT_HRMS_20260216_xxxxx.bkp
 L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
+
+
+
+==============================================  Crontab Backup Automation  ===========================================
+
+	Sunday        → Level 0 (Full)
+	Mon–Sat       → Level 1 (Incremental)
+	Every 1–2 hr  → Archivelog
+
+
+	সব cronjob দিয়ে automate করবো।
+
+	✅ Step-1: RMAN Script তৈরি করা
+
+	আমরা ৩টা আলাদা script বানাবো।
+
+	🔹 1️. Level 0 Script (Sunday Full Backup)
+
+	📁 File: /u01/rman_scripts/level0.sh
+
+	#!/bin/bash
+
+	ORACLE_SID=PRIMARY
+	export ORACLE_SID
+	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
+	export ORACLE_HOME
+	PATH=$ORACLE_HOME/bin:$PATH
+
+	rman target / <<EOF
+
+	RUN {
+	  BACKUP INCREMENTAL LEVEL 0 DATABASE
+		FORMAT '/u01/rman_backup/L0/L0_%d_%T_%U.bkp'
+		TAG 'WEEKLY_L0';
+
+	  BACKUP ARCHIVELOG ALL
+		FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
+		NOT BACKED UP 1 TIMES;
+
+	  BACKUP CURRENT CONTROLFILE
+		FORMAT '/u01/rman_backup/CONTROL/control_%d_%T_%U.bkp';
+	}
+
+	EOF
+
+	🔹 2️. Level 1 Script (Mon–Sat)
+
+	📁 File: /u01/rman_scripts/level1.sh
+
+	#!/bin/bash
+
+	ORACLE_SID=PRIMARY
+	export ORACLE_SID
+	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
+	export ORACLE_HOME
+	PATH=$ORACLE_HOME/bin:$PATH
+
+	rman target / <<EOF
+
+	RUN {
+	  BACKUP INCREMENTAL LEVEL 1 DATABASE
+		FORMAT '/u01/rman_backup/L1/L1_%d_%T_%U.bkp'
+		TAG 'DAILY_L1';
+
+	  BACKUP ARCHIVELOG ALL
+		FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
+		NOT BACKED UP 1 TIMES;
+	}
+
+	EOF
+
+	🔹 3️. Archivelog Script (Every 1 Hour)
+
+	📁 File: /u01/rman_scripts/arch.sh
+
+	#!/bin/bash
+
+	ORACLE_SID=PRIMARY
+	export ORACLE_SID
+	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
+	export ORACLE_HOME
+	PATH=$ORACLE_HOME/bin:$PATH
+
+	rman target / <<EOF
+
+	BACKUP
+	  ARCHIVELOG ALL
+	  NOT BACKED UP 1 TIMES
+	  FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp';
+
+	EOF
+	
+	
+	==============================================================================================================================
+
+	সব script executable করো:
+	chmod +x /u01/rman_scripts/*.sh
+
+	✅ Step-2: Cronjob Setup
+	
+	crontab -e
+
+	# Sunday Level 0 – 2:00 AM
+	0 2 * * 0 /u01/rman_scripts/level0.sh >> /u01/rman_backup/backup.log 2>&1
+
+	# Mon–Sat Level 1 – 2:00 AM
+	0 2 * * 1-6 /u01/rman_scripts/level1.sh >> /u01/rman_backup/backup.log 2>&1
+
+	# Every 1 hour Archivelog
+	0 * * * * /u01/rman_scripts/arch.sh >> /u01/rman_backup/arch.log 2>&1
+
+	🔥 Production Important Configuration
+
+	একবার configure করে রাখবে:
+
+	CONFIGURE CONTROLFILE AUTOBACKUP ON;
+	CONFIGURE BACKUP OPTIMIZATION ON;
+	CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF 7 DAYS;
+
+	🎯 Interview Question আসতে পারে
+
+	❓ Why Level 0 on Sunday?
+
+	👉 Because it acts as base for incremental backups.
+
+	❓ Why frequent archivelog backup?
+
+	👉 To minimize data loss window and reduce FRA usage.
+
+	❓ Why NOT BACKED UP 1 TIMES?
+
+	👉 To prevent duplicate archivelog backups.
 
 
 
