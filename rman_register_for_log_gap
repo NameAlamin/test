@@ -1,0 +1,299 @@
+
+=================================================================================== Standby  =============================================================
+
+
+[oracle@standby ~]$ sqlplus / as sysdba
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+SQL> alter database open read only;
+alter database open read only
+*
+ERROR at line 1:
+ORA-10458: standby database requires recovery
+ORA-01196: file 1 is inconsistent due to a failed media recovery session
+ORA-01110: data file 1:
+'/u01/app/oracle/oradata/KNIT_HRMS/datafile/o1_mf_system_ns2h412t_.dbf'
+
+
+
+=================================================================================== Standby  =============================================================
+
+
+SQL> SELECT * FROM V$ARCHIVE_GAP;
+
+   THREAD# LOW_SEQUENCE# HIGH_SEQUENCE#     CON_ID
+---------- ------------- -------------- ----------
+         1            52             58          1
+
+
+এখানে ৫২ থেকে ৫৮ পর্যন্ত আর্কাইভ লগ প্রাইমারি থেকে মিসিং। এখন ২ টা উপায় আছে।
+
+১) যদি ৫২ থেকে ৫৮ পর্যন্ত আর্কাইভ লগ প্রাইমারি তে আরকারভ ব্যাকআপ এ থাকে সেখান থেকে স্টেন্ডবাই এ নিয়ে 
+ALTER DATABASE REGISTER LOGFILE '/u01/arch_gap/o1_mf_1_22_.arc'; এভাবে REGISTER করাতে হবে।
+
+২) যদি ৫২ থেকে ৫৮ পর্যন্ত আর্কাইভ লগ প্রাইমারি তে আরকারভ ব্যাকআপ এ না থাকে ডিলিট হয়ে যেয়ে থাকে তাহলে scn number ধরে incremental backup নিয়ে সেটি দিয়ে দেখতে হবে। 
+
+
+
+=================================================================================== Standby  =============================================================
+
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE DISCONNECT FROM SESSION;
+
+Database altered.
+
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+ARCH     ARCH               0 CONNECTED
+N/A      DGRD               0 ALLOCATED
+N/A      DGRD               0 ALLOCATED
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH               0 CONNECTED
+Archival RFS                0 IDLE
+LGWR     RFS               64 IDLE   -> বর্তমান লগ ৬৪ কিন্তু APPLY হয়েছে ৫২ পর্যন্ত 
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+N/A      MRP0              52 APPLYING_LOG
+
+12 rows selected.
+
+
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+ARCH     ARCH              64 CLOSING
+N/A      DGRD               0 ALLOCATED
+N/A      DGRD               0 ALLOCATED
+ARCH     ARCH              65 CLOSING
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH               0 CONNECTED
+Archival RFS                0 IDLE
+LGWR     RFS               66 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+N/A      MRP0              52 APPLYING_LOG
+
+12 rows selected.
+
+
+
+
+
+=============================================================== Primary  =============================================================
+
+desc V$ARCHIVED_LOG;
+
+
+
+=============================================================== Primary  =============================================================
+
+SQL> SELECT NAME
+FROM V$ARCHIVED_LOG;
+
+
+
+=============================================================== Standby =============================================================
+
+
+SQL> SELECT SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG ORDER BY SEQUENCE#;
+
+ SEQUENCE# APPLIED
+---------- ---------
+        50 YES
+        51 YES
+        59 NO
+        60 NO
+        61 NO
+        62 NO
+        63 NO
+        64 NO
+        65 NO
+
+9 rows selected.
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+
+
+=============================================================== Standby  =============================================================
+
+
+*** Primary theke scp kore gap howa 52 theke 58 porjonto archive log gulo stand by er 1 ta folder ay niye jabo
+
+
+SQL> SELECT SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG ORDER BY SEQUENCE#;
+
+ SEQUENCE# APPLIED
+---------- ---------
+        50 YES
+        51 YES
+        59 NO
+        60 NO
+        61 NO
+        62 NO
+        63 NO
+        64 NO
+        65 NO
+
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_52_ns5th0rw_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_53_ns5thh2t_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_54_ns5tjvms_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_55_ns5tl348_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_56_ns5tlv3l_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_57_ns5w66pz_.arc';
+
+SQL> ALTER DATABASE REGISTER LOGFILE '/u01/backup/o1_mf_1_58_ns5w78bv_.arc';
+
+SQL> SELECT SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG ORDER BY SEQUENCE#;
+
+---------------------
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION;
+
+Database altered.
+
+
+SQL> SELECT SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG ORDER BY SEQUENCE#;
+
+ SEQUENCE# APPLIED
+---------- ---------
+        50 YES
+        51 YES
+        52 NO
+        53 YES
+        54 YES
+        55 YES
+        56 YES
+        57 YES
+        58 YES
+        59 YES
+        60 YES
+
+ SEQUENCE# APPLIED
+---------- ---------
+        61 YES
+        62 YES
+        63 NO
+        64 NO
+        65 NO
+        66 NO
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+ARCH     ARCH              64 CLOSING
+N/A      DGRD               0 ALLOCATED
+N/A      DGRD               0 ALLOCATED
+ARCH     ARCH              65 CLOSING
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH              66 CLOSING
+Archival RFS                0 IDLE
+LGWR     RFS               67 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+N/A      MRP0              67 APPLYING_LOG
+
+
+
+
+SQL> select open_mode from v$database;
+
+OPEN_MODE
+--------------------
+MOUNTED
+
+
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+
+
+
+SQL> alter database open read only;
+
+
+
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION;
+
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+ARCH     ARCH              64 CLOSING
+N/A      DGRD               0 ALLOCATED
+N/A      DGRD               0 ALLOCATED
+ARCH     ARCH              65 CLOSING
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH              66 CLOSING
+Archival RFS                0 IDLE
+LGWR     RFS               67 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+N/A      MRP0              67 APPLYING_LOG
+
+
+
+
+SQL> select client_process,process,sequence#,status from v$managed_standby;
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+ARCH     ARCH              64 CLOSING
+N/A      DGRD               0 ALLOCATED
+N/A      DGRD               0 ALLOCATED
+ARCH     ARCH              67 CLOSING
+ARCH     ARCH               0 CONNECTED
+ARCH     ARCH              66 CLOSING
+Archival RFS                0 IDLE
+LGWR     RFS               68 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+UNKNOWN  RFS                0 IDLE
+
+CLIENT_P PROCESS    SEQUENCE# STATUS
+-------- --------- ---------- ------------
+N/A      MRP0              68 APPLYING_LOG
