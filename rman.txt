@@ -182,7 +182,8 @@
 		*** RMAN> CONFIGURE BACKUP OPTIMIZATION ON; জেহেতু OPTIMIZATION ON তাই DELETE INPUT; করা লাগবে না। একই লগ দ্বিতীয় বার ব্যাক
 
 		*** jodi dekhte chai kon backup ay kon sequence theke kon sequence porjonto ase 
-		LIST BACKUP OF ARCHIVELOG ALL;
+		
+		*** আরমেন থেকে কি কি ব্যাকআপ নেওয়া হয়েছে সেগুলো দেখবো =  LIST BACKUP OF ARCHIVELOG ALL;
 		
 		*** policy add korte hobe --> archive log backup na hole delete kora jabe na fra theke.
 
@@ -879,77 +880,113 @@ L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
 
 	📁 File: /u01/rman_scripts/level0.sh
 
-	#!/bin/bash
+#!/bin/bash
 
-	ORACLE_SID=PRIMARY
-	export ORACLE_SID
-	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
-	export ORACLE_HOME
-	PATH=$ORACLE_HOME/bin:$PATH
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
+export ORACLE_SID=KNIT_HRMS
+export PATH=$ORACLE_HOME/bin:$PATH
 
-	rman target / <<EOF
+rman target sys/sys123@KNIT_HRMS <<EOF
 
-	RUN {
-	  BACKUP INCREMENTAL LEVEL 0 DATABASE
-		FORMAT '/u01/rman_backup/L0/L0_%d_%T_%U.bkp'
-		TAG 'WEEKLY_L0';
+RUN {
+  BACKUP INCREMENTAL LEVEL 0 DATABASE
+	FORMAT '/u01/rman_backup/L0/L0_%d_%T_%U.bkp'
+	TAG 'WEEKLY_L0';
 
-	  BACKUP ARCHIVELOG ALL
-		FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
-		NOT BACKED UP 1 TIMES;
+  BACKUP ARCHIVELOG ALL
+	FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
+	NOT BACKED UP 1 TIMES;
 
-	  BACKUP CURRENT CONTROLFILE
-		FORMAT '/u01/rman_backup/CONTROL/control_%d_%T_%U.bkp';
-	}
+  BACKUP CURRENT CONTROLFILE
+	FORMAT '/u01/rman_backup/CONTROL/control_%d_%T_%U.bkp';
+}
 
-	EOF
+EOF
+
+========================================================================= What is TAG 
+
+	🔎 TAG কী?
+
+		TAG হচ্ছে RMAN backup-এর একটি logical label বা identifier, যেটা দিয়ে পরে সহজে সেই backup-টাকে চিনতে, খুঁজতে বা restore করতে পারবে।
+
+		এটা physical file name না — এটা RMAN catalog/control file-এ metadata হিসেবে সংরক্ষিত থাকে।
+
+	📌 কেন TAG ব্যবহার করা হয়?
+
+		ধরো:
+
+		প্রতি সপ্তাহে তুমি Level 0 backup নিচ্ছো
+
+		প্রতিদিন Level 1 backup নিচ্ছো
+
+		তাহলে তুমি এভাবে tag দিতে পারো:
+
+		TAG 'WEEKLY_L0'
+		TAG 'DAILY_L1'
+
+
+		এতে পরে খুব সহজে বলতে পারবে:
+
+		RESTORE DATABASE FROM TAG 'WEEKLY_L0';
+
+
+		অথবা
+
+		LIST BACKUP TAG 'WEEKLY_L0';
+
+=========================================================================
+
 
 	🔹 2️. Level 1 Script (Mon–Sat)
 
 	📁 File: /u01/rman_scripts/level1.sh
 
-	#!/bin/bash
+#!/bin/bash
 
-	ORACLE_SID=PRIMARY
-	export ORACLE_SID
-	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
-	export ORACLE_HOME
-	PATH=$ORACLE_HOME/bin:$PATH
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
+export ORACLE_SID=KNIT_HRMS
+export PATH=$ORACLE_HOME/bin:$PATH
 
-	rman target / <<EOF
+rman target sys/sys123@KNIT_HRMS <<EOF
 
-	RUN {
-	  BACKUP INCREMENTAL LEVEL 1 DATABASE
-		FORMAT '/u01/rman_backup/L1/L1_%d_%T_%U.bkp'
-		TAG 'DAILY_L1';
+RUN {
+        BACKUP INCREMENTAL LEVEL 1 DATABASE
+        FORMAT '/u01/rman_backup/L1/L1_%d_%T_%U.bkp'
+        TAG 'DAILY_L1';
 
-	  BACKUP ARCHIVELOG ALL
-		FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
-		NOT BACKED UP 1 TIMES;
-	}
+        BACKUP ARCHIVELOG ALL
+        FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
+        NOT BACKED UP 1 TIMES;
 
-	EOF
+        BACKUP CURRENT CONTROLFILE
+        FORMAT '/u01/rman_backup/CONTROL/control_%d_%T_%U.bkp';
+}
+
+EOF
+
+
 
 	🔹 3️. Archivelog Script (Every 1 Hour)
 
 	📁 File: /u01/rman_scripts/arch.sh
 
-	#!/bin/bash
+#!/bin/bash
 
-	ORACLE_SID=PRIMARY
-	export ORACLE_SID
-	ORACLE_HOME=/u01/app/oracle/product/19.0.0/dbhome_1
-	export ORACLE_HOME
-	PATH=$ORACLE_HOME/bin:$PATH
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1
+export ORACLE_SID=KNIT_HRMS
+export PATH=$ORACLE_HOME/bin:$PATH
 
-	rman target / <<EOF
+rman target sys/sys123@KNIT_HRMS <<EOF
 
-	BACKUP
-	  ARCHIVELOG ALL
-	  NOT BACKED UP 1 TIMES
-	  FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp';
+RUN {
 
-	EOF
+        BACKUP ARCHIVELOG ALL
+        FORMAT '/u01/rman_backup/ARCH/arch_%d_%T_%U.bkp'
+        NOT BACKED UP 1 TIMES;
+
+}
+
+EOF
 	
 	
 	==============================================================================================================================
@@ -959,16 +996,21 @@ L1_arch_KNIT_HRMS_20260216_xxxxx.bkp
 
 	✅ Step-2: Cronjob Setup
 	
+	su - oracle
+	
 	crontab -e
 
 	# Sunday Level 0 – 2:00 AM
-	0 2 * * 0 /u01/rman_scripts/level0.sh >> /u01/rman_backup/backup.log 2>&1
+	0 2 * * 0 /u01/rman_scripts/level0.sh >> /u01/rman_scripts/scripts_log/L0_backup.log
 
 	# Mon–Sat Level 1 – 2:00 AM
-	0 2 * * 1-6 /u01/rman_scripts/level1.sh >> /u01/rman_backup/backup.log 2>&1
+	0 2 * * 1-6 /u01/rman_scripts/level1.sh >> /u01/rman_scripts/scripts_log/L1_backup.log
 
 	# Every 1 hour Archivelog
-	0 * * * * /u01/rman_scripts/arch.sh >> /u01/rman_backup/arch.log 2>&1
+	0 * * * * /u01/rman_scripts/arch.sh >> /u01/rman_scripts/scripts_log/Daily_arch.log
+	
+	# Jodi ajke crontab chalate chai
+	28 11 * * * /u01/rman_scripts/level0.sh >> /u01/rman_scripts/scripts_log/L0_backup.log
 
 	🔥 Production Important Configuration
 
