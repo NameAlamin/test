@@ -280,59 +280,6 @@ export NLS_DATE_FORMAT=dd/mm/yyyy:hh24:mi:ss
 
 ***********************************************************************************************************************************
 
-==> Now Set Some parameter in primary database for Data Guard
-========================== Primary Database Parameter set for data gurad ===========================================================
-
-show parameter db_name;
-show parameter service_names;
-
-0. select name,db_unique_name,open_mode,force_logging,flashback_on from v$database;
-0. select GROUP#,SEQUENCE#,MEMBERS,BYTES/1024/1024 "in mb",status from v$log;
-0. select GROUP#,MEMBER,STATUS from v$logfile;
-0. select name from v$datafile;
-
---------- ASM er jonne
-1. SELECT name FROM v$asm_diskgroup; [+DATA = check ASM disk group]
-1. ALTER DATABASE ADD STANDBY LOGFILE group 4'+DATA/LIVEDB/ONLINELOG/standby1.log' size 200m;
-1. ALTER DATABASE ADD STANDBY LOGFILE group 5'+DATA/LIVEDB/ONLINELOG/standby2.log' size 200m;
-1. ALTER DATABASE ADD STANDBY LOGFILE group 6'+DATA/LIVEDB/ONLINELOG/standby3.log' size 200m;
----------
-
-0. select GROUP#,SEQUENCE#,STATUS from v$standby_log;
-1. alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo1.log') size 200m;
-1. alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo2.log') size 200m;
-1. alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo3.log') size 200m;
-1. alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo4.log') size 200m;
-
-2. ALTER SYSTEM SET DB_UNIQUE_NAME='livedb' SCOPE=SPFILE;
-
-3. alter system set log_archive_config='DG_CONFIG=(livedb,livedr)'scope=spfile;
-
-4. ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
-
-5. ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedr ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile;
-
-6. ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
-6. ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
-
-7. ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both; (auto,menual bolte ki bojhay??? - ei peremater er kaj ki??? )===============================
-
-8. alter system set db_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDR' scope=spfile;  
-
-   [ now create folder standby: /u01/app/oracle/oradata/LIVEDR]-> and now check oradata folder have permission is oinstall must ->check this 
-
-9. alter system set log_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDR' scope=spfile;
-
-10. ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
-
-11. alter system set FAL_CLIENT='LIVEDB' SCOPE=SPFILE;
-
-12. alter system set FAL_SERVER='LIVEDR' SCOPE=SPFILE;
-
-13. shutdown immediate -> spfile ay parameter gula apply hobe then -startup
-
-0. show parameter log_archive_config;
-
 ============================== End Primary Database Parameter set =======================================================
 
 
@@ -379,7 +326,7 @@ VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON
 SID_LIST_LISTENER=
   (SID_LIST=
         (SID_DESC=
-          (SID_NAME=livedr)
+          (SID_NAME=HRMSDR)
           (ORACLE_HOME=/u01/app/oracle/product/19.0.0.0/dbhome_1)
           ))
 
@@ -452,28 +399,65 @@ ADR_BASE_LISTENER = /u01/app/oracle
 	sqlplus / as sysdba
 	startup nomount
 	
-	======================================================== start standby =============================================================================================== 
-	1. ALTER SYSTEM SET DB_UNIQUE_NAME='livedr' SCOPE=SPFILE;
-	2. alter system set log_archive_config='DG_CONFIG=(livedb,livedr)'scope=spfile;
-	3. ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=/u01/app/oracle/fra VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile;
-	3. ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile; [For ASM]
-	4. ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedb ASYNC VALID_FOR=(ALL_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
-	5. ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
-	5. ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
-	6. ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
-	7. ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
-	8. alter system set FAL_CLIENT='LIVEDR' SCOPE=SPFILE;
-	9. alter system set FAL_SERVER='LIVEDB' SCOPE=SPFILE;
 	
-	shutdown immediate
-	startup nomount
+
+=============================  Primary Server Database Parameter set for data gurad ==================================================
+
+show parameter db_name;
+show parameter service_names;
+
+0. select name,db_unique_name,open_mode,force_logging,flashback_on from v$database;
+0. select GROUP#,SEQUENCE#,MEMBERS,BYTES/1024/1024 "in mb",status from v$log;
+0. select GROUP#,MEMBER,STATUS from v$logfile;
+0. select name from v$datafile;
+
+
+select GROUP#,SEQUENCE#,STATUS from v$standby_log;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo1.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo2.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo3.log') size 200m;
+alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/redo4.log') size 200m;
+ALTER SYSTEM SET DB_UNIQUE_NAME='livedb' SCOPE=SPFILE;
+alter system set log_archive_config='DG_CONFIG=(livedb,livedr)'scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedr ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
+alter system set db_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDR' scope=spfile;  
+------[ now create folder standby: /u01/app/oracle/oradata/LIVEDR]-> and now check oradata folder have permission is oinstall must ->check this 
+alter system set log_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDR' scope=spfile;
+ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
+alter system set FAL_CLIENT='LIVEDB' SCOPE=SPFILE;
+alter system set FAL_SERVER='LIVEDR' SCOPE=SPFILE;
+shutdown immediate -> spfile ay parameter gula apply hobe then -startup
+show parameter log_archive_config;
 	
+	
+=============================  Standby Server Database Parameter set for data gurad ==================================================
+	
+ALTER SYSTEM SET DB_UNIQUE_NAME='livedr' SCOPE=SPFILE;
+alter system set log_archive_config='DG_CONFIG=(livedb,livedr)'scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=/u01/app/oracle/fra VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedr' scope=spfile; [For ASM]
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedb ASYNC VALID_FOR=(ALL_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
+ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
+alter system set FAL_CLIENT='LIVEDR' SCOPE=SPFILE;
+alter system set FAL_SERVER='LIVEDB' SCOPE=SPFILE;
+shutdown immediate
+startup nomount
+	
+
+---------------------------------------------------------------------------------------------------------------------------------------------
 
 *** Now i am run rman duplicate command. so connect primary oracle user connect rman
 	su - oracle [primary]
 	. oraenv
 	
-	rman TARGET sys/a123@livedb AUXILIARY sys/a123@livedr [if successfully connect then duplicate command run]
+	rman TARGET sys/sys123@livedb AUXILIARY sys/sys123@livedr [if successfully connect then duplicate command run]
 	
 	** check standby database cd /u01/app/oracle/oradata/LIVEDR must be having purmission oradata is oracle:oinstall and LIVEDR is oracle:oinstall 1st check permission standby
 	
@@ -549,17 +533,7 @@ ADR_BASE_LISTENER = /u01/app/oracle
 	
 	
 	SELECT value "Lag", datum_time "Received Time", Time_Computed "Time Computed " FROM V$DATAGUARD_STATS WHERE name like 'apply lag';	
-
-
-
-******************************************************************************************************************************************************
-***************************** 📌 Data Guard Clean Shutdown Korar Rule ************************************************************************************
-
-Standby shutdown করার আগে সবসময়:
-ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
-SHUTDOWN IMMEDIATE;
-
-তারপর primary shutdown করো।
+	
 
 
 
@@ -600,70 +574,265 @@ Data Guard broker কিছু ক্ষেত্রে
 
 
 
-
-******************************************************************************************************************************************************
-***************************** 2) Primary Server Add Listener side ************************************************************************************
+======================================================================================================================================================
+=================================================  Primary Server ay Multiple DR Add Korar Jonne  ====================================================
+======================================================================================================================================================	
 
 *** primary and standbytwo 2 ta server er tns ay 2 server ay 2 ta entry dite hobe.
-
-
-
-
-******************************************************************************************************************************************************
-*****************************  3)  Primary Database Command For add 2nd Standby database for data guard **************************************************
-
 
 select GROUP#,SEQUENCE#,STATUS from v$standby_log;
 alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo1.log') size 200m;
 alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_tworedo2.log') size 200m;
 alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo3.log') size 200m;
 alter database add standby logfile ('/u01/app/oracle/oradata/LIVEDB/onlinelog/livedr_two_redo4.log') size 200m;
-
 ALTER SYSTEM SET DB_UNIQUE_NAME='livedb' SCOPE=SPFILE;
-
 alter system set log_archive_config='DG_CONFIG=(livedb,livedr,livedrtwo)'scope=spfile;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_3='SERVICE=livedrtwo ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedrtwo' scope=spfile;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_3='ENABLE' SCOPE=SPFILE;
-
 alter system set db_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDRTWO' scope=spfile;  
-
 alter system set log_File_name_convert='/u01/app/oracle/oradata/LIVEDB/','/u01/app/oracle/oradata/LIVEDRTWO' scope=spfile;
-
 alter system set FAL_SERVER='LIVEDR,LIVEDRTWO' SCOPE=SPFILE;
 
 
-
-
-
-
-******************************************************************************************************************************************************
-*****************************  4)  2nd Standby Database LIVEDRTWO Command for data guard *************************************************************					
+======================================================================================================================================================
+=================================================  Standby Server ay Multiple DR Add Korar Jonne  ====================================================
+======================================================================================================================================================					
 						
-
 ALTER SYSTEM SET DB_UNIQUE_NAME='livedrtwo' SCOPE=SPFILE;
-
 alter system set log_archive_config='DG_CONFIG=(livedb,livedrtwo)'scope=spfile;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=/u01/app/oracle/fra VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=livedrtwo' scope=spfile;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=livedb ASYNC VALID_FOR=(ALL_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=livedb' scope=spfile;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
-
 ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
-
 ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
-
 ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
-
 alter system set FAL_CLIENT='LIVEDRTWO' SCOPE=SPFILE;
-
 alter system set FAL_SERVER='LIVEDB' SCOPE=SPFILE;				
 					
-				
-					
-						
 
+
+
+
+======================================================================================================================================================
+=================================================  ASM + GRID + Data Guard  ==========================================================================
+======================================================================================================================================================
+				
+
+
+show parameter db_name;
+show parameter service_names;
+
+0. select name,db_unique_name,open_mode,force_logging,flashback_on from v$database;
+0. select GROUP#,SEQUENCE#,MEMBERS,BYTES/1024/1024 "in mb",status from v$log;
+0. select GROUP#,MEMBER,STATUS from v$logfile;
+0. select name from v$datafile;
+
+--------- Primary ASM er jonne
+
+
+----------------------------------------------------------------------------------------------------
+1. SELECT name FROM v$asm_diskgroup; [+DATA = check ASM disk group]
+
+SELECT group#, bytes/1024/1024 MB FROM v$log;
+select GROUP#,SEQUENCE#,STATUS from v$standby_log;
+                                              
+🔵 Option 1 (Recommended – Simple Way)
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+
+👉 Oracle নিজেই group number auto assign করবে।
+
+🔵 Option 2 (Manual Group Number দিয়ে – Correct Syntax)
+
+ALTER DATABASE ADD STANDBY LOGFILE GROUP 4 ('+DATA/HRMS/ONLINELOG/standby4.log') SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE GROUP 5 ('+DATA/HRMS/ONLINELOG/standby5.log') SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE GROUP 6 ('+DATA/HRMS/ONLINELOG/standby6.log') SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE GROUP 7 ('+DATA/HRMS/ONLINELOG/standby7.log') SIZE 200M;
+
+-------------------------------------   Primary   ----------------------------------------------------------------
+
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER SYSTEM SET DB_UNIQUE_NAME='HRMS' SCOPE=SPFILE;
+alter system set log_archive_config='DG_CONFIG=(HRMS,HRMSDR)'scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=HRMS' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=HRMSDR ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=HRMSDR' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
+ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
+alter system set FAL_CLIENT='HRMS' SCOPE=SPFILE;
+alter system set FAL_SERVER='HRMSDR' SCOPE=SPFILE;
+ALTER SYSTEM SET DB_FILE_NAME_CONVERT='+FRA/HRMS','+FRA/HRMSDR' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_FILE_NAME_CONVERT='+FRA/HRMS','+FRA/HRMSDR'SCOPE=SPFILE;
+
+shutdown immediate -> spfile ay parameter gula apply hobe then -startup
+
+
+---------------------------------  Standby   --------------------------------------------------------------------------
+
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER DATABASE ADD STANDBY LOGFILE SIZE 200M;
+ALTER SYSTEM SET DB_UNIQUE_NAME='HRMSDR' SCOPE=SPFILE;
+alter system set log_archive_config='DG_CONFIG=(HRMS,HRMSDR)'scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='LOCATION=use_db_recovery_file_dest VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=HRMSDR' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='SERVICE=HRMS ASYNC VALID_FOR=(ALL_LOGFILES,PRIMARY_ROLES) DB_UNIQUE_NAME=HRMS' scope=spfile;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_1='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2='ENABLE' SCOPE=SPFILE;
+ALTER SYSTEM SET standby_file_management='AUTO' SCOPE=both;
+ALTER SYSTEM SET REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE SCOPE=SPFILE;
+alter system set FAL_CLIENT='HRMSDR' SCOPE=SPFILE;
+alter system set FAL_SERVER='HRMS' SCOPE=SPFILE;	
+ALTER SYSTEM SET DB_CREATE_FILE_DEST='+FRA' SCOPE=BOTH;
+ALTER SYSTEM SET DB_FILE_NAME_CONVERT='+FRA/HRMS','+FRA/HRMSDR' SCOPE=SPFILE;
+ALTER SYSTEM SET LOG_FILE_NAME_CONVERT='+FRA/HRMS','+FRA/HRMSDR'SCOPE=SPFILE;
+
+shutdown immediate
+
+*** Duplicate Command  =  DUPLICATE TARGET DATABASE FOR STANDBY FROM ACTIVE DATABASE DORECOVER;
+
+
+
+
+======================================================================================================================================================
+=================================================   DG Fail-Over Process  ============================================================================
+======================================================================================================================================================
+
+
+
+🔥 MANUAL FAILOVER (Without Broker)
+✅ Step 1: Standby database status check
+
+Standby server এ login করুন:
+
+sqlplus / as sysdba
+
+
+Check করুন database role:
+
+SELECT NAME, DATABASE_ROLE, OPEN_MODE 
+FROM V$DATABASE;
+
+
+Expected output:
+
+DATABASE_ROLE = PHYSICAL STANDBY
+OPEN_MODE     = MOUNTED
+
+✅ Step 2: Managed Recovery cancel করুন
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+
+এখন recovery বন্ধ।
+
+Verify:
+
+SELECT PROCESS, STATUS FROM V$MANAGED_STANDBY;
+
+
+MRP process থাকা উচিত না।
+
+✅ Step 3: Last archive log applied check
+SELECT THREAD#, MAX(SEQUENCE#) 
+FROM V$ARCHIVED_LOG 
+WHERE APPLIED='YES'
+GROUP BY THREAD#;
+
+
+👉 এখানে বুঝবেন শেষ কোন sequence পর্যন্ত apply হয়েছে।
+
+⚠️ Primary পুরোপুরি dead কিনা নিশ্চিত হন
+(না হলে split brain risk থাকবে)
+
+🔥 Step 4: Standby Activate করুন (Main Failover Step)
+ALTER DATABASE ACTIVATE STANDBY DATABASE;
+
+
+⚠️ Important:
+
+এটা irreversible
+
+Standby এখন new PRIMARY হবে
+
+✅ Step 5: Database open করুন
+ALTER DATABASE OPEN;
+
+✅ Step 6: Verify new role
+SELECT NAME, DATABASE_ROLE, OPEN_MODE 
+FROM V$DATABASE;
+
+
+Expected:
+
+DATABASE_ROLE = PRIMARY
+OPEN_MODE     = READ WRITE
+
+🔎 After Failover – Post Steps
+1️⃣ Tempfile check
+SELECT NAME FROM V$TEMPFILE;
+
+
+Tempfile missing থাকলে recreate করুন।
+
+2️⃣ Redo log status check
+SELECT GROUP#, STATUS FROM V$LOG;
+
+3️⃣ Listener & service check
+lsnrctl status
+
+
+Application connectivity test করুন।
+
+🚨 Very Important Production Points
+🔴 Case 1: Flashback ON ছিল?
+
+Check করুন:
+
+SELECT FLASHBACK_ON FROM V$DATABASE;
+
+
+যদি ON থাকে → old primary পরে reinstate করা যাবে।
+
+🔴 Case 2: Flashback OFF থাকলে
+
+Old primary completely rebuild করতে হবে:
+
+RMAN backup restore
+
+Or duplicate from active database
+
+🧠 Data Loss Consideration
+
+যদি protection mode:
+
+Mode	Data Loss
+Maximum Protection	No loss
+Maximum Availability	Minimal
+Maximum Performance	Possible loss
+
+Check mode:
+
+SELECT PROTECTION_MODE FROM V$DATABASE;
+
+🎯 Real DBA Practical Flow (Short Version)
+
+Confirm primary dead
+
+Cancel MRP
+
+Check last applied log
+
+ACTIVATE STANDBY
+
+OPEN DB
+
+Verify role
+
+Inform app team
 
